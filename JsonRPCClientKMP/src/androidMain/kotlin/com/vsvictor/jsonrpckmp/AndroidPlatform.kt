@@ -9,15 +9,14 @@ import java.io.File
 
 private var applicationContext: Context? = null
 
+@Suppress("unused")
 object JsonRpcClientKmp {
     fun installAndroidContext(context: Context) {
         applicationContext = context.applicationContext
     }
 }
 
-internal actual object Platform {
-    actual val isIos: Boolean = false
-}
+internal actual val isIosPlatform: Boolean = false
 
 internal actual fun connectPlatform(options: NativeConnectionOptions): PlatformRpcClient {
     val ffiOptions = ConnectOptions(

@@ -74,9 +74,9 @@ val builder = JsonRpcClientBuilder(RpcTransport.QUIC, "localhost", 443)
     .caCertificateAsset("server-ca.der", CertificateFormat.DER)
 ```
 
-For file access, use `caCertificateFile(path, format)`. Android assets are read from the app's `AssetManager`: call `JsonRpcClientKmp.installAndroidContext(applicationContext)` once before asset loading and place the asset in the consuming app's `src/main/assets`. On iOS, assets are resolved from the main app bundle; add the certificate file to the app target's Copy Bundle Resources. Filesystem paths are interpreted by the platform as native paths.
+For file access, use `caCertificateFile(path, format)`. These assets belong to the **application that consumes this KMP library**, not to this library's own source sets. In an Android app, place the file in the app module's `src/main/assets/` and call `JsonRpcClientKmp.installAndroidContext(applicationContext)` once before loading it. In an iOS app, add the file to the app target's **Copy Bundle Resources**; the library resolves it from the main app bundle. Filesystem paths are interpreted by the platform as native paths.
 
-To load a certificate from a shared Compose Multiplatform resource, place the file in the consuming KMP module's `src/commonMain/composeResources/files/`. Use that module's generated `Res.readBytes` accessor with `caCertificateResource`; this keeps resource lookup in the module that owns the generated `Res` class and works with either PEM or DER:
+For a Compose Multiplatform app, the portable option is a shared Compose resource: place the certificate in the consuming app's `src/commonMain/composeResources/files/` (not in the library module), then pass its bytes to `caCertificateResource`. Use the generated `Res.readBytes` accessor from the module that owns the resource:
 
 ```kotlin
 import jsonrpcclientkmpexample.shared.generated.resources.Res

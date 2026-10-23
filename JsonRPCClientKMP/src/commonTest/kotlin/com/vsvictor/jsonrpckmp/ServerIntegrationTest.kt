@@ -11,6 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.test.fail
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /** Host of a running `JSON_RPC_2 server` (see README), or null when the platform cannot reach it. */
@@ -42,7 +43,8 @@ class ServerIntegrationTest {
         }
     }
 
-    private suspend fun realDelay(millis: Long) = withContext(Dispatchers.Default) { delay(millis) }
+    private suspend fun realDelay(millis: Long) =
+        withContext(Dispatchers.Default) { delay(millis.milliseconds) }
 
     @Test
     fun tcpEchoReturnsParams() = runTest(timeout = 60.seconds) {

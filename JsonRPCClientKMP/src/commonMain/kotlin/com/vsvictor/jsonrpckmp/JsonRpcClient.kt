@@ -5,7 +5,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 enum class RpcTransport(
     internal val wireName: String,
@@ -193,6 +192,7 @@ class JsonRpcClient internal constructor(private val native: PlatformRpcClient) 
     }
 }
 
+@Suppress("unused")
 class JsonRpcClientBuilder(
     private val transport: RpcTransport,
     private val host: String,
@@ -264,7 +264,7 @@ class JsonRpcClientBuilder(
         require(transport != RpcTransport.SRT && transport != RpcTransport.WS_SRT || !srtPassphrase.isNullOrBlank()) {
             "SRT transport requires a passphrase"
         }
-        if (!transport.supportedOnIos && Platform.isIos) {
+        if (!transport.supportedOnIos && isIosPlatform) {
             throw UnsupportedOperationException("${transport.name} is not available on iOS in json-rpc-2")
         }
         val native = connectPlatform(
@@ -300,13 +300,12 @@ class JsonRpcClientBuilder(
     }
 }
 
-@OptIn(ExperimentalEncodingApi::class)
 internal fun certificateToPem(bytes: ByteArray, format: CertificateFormat): String {
     require(bytes.isNotEmpty()) { "Certificate data is empty" }
     val pem = when (format) {
         CertificateFormat.PEM -> bytes.decodeToString()
         CertificateFormat.DER -> {
-            val base64 = Base64.Default.encode(bytes)
+            val base64 = Base64.encode(bytes)
             buildString {
                 append("-----BEGIN CERTIFICATE-----\n")
                 base64.chunked(64).forEach { append(it).append('\n') }
@@ -318,6 +317,4 @@ internal fun certificateToPem(bytes: ByteArray, format: CertificateFormat): Stri
     return pem
 }
 
-internal expect object Platform {
-    val isIos: Boolean
-}
+internal expect val isIosPlatform: Boolean

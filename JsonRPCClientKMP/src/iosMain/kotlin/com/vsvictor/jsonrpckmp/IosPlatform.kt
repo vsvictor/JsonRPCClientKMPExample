@@ -25,34 +25,28 @@ import kotlinx.cinterop.toKString
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
-import kotlinx.cinterop.refTo
 import platform.Foundation.NSBundle
 import platform.Foundation.NSData
 import platform.Foundation.dataWithContentsOfFile
 import platform.posix.memcpy
-import platform.Foundation.NSString
 
-internal actual object Platform {
-    actual val isIos: Boolean = true
-}
+internal actual val isIosPlatform: Boolean = true
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun connectPlatform(options: NativeConnectionOptions): PlatformRpcClient = memScoped {
     val error = alloc<CPointerVar<ByteVar>>()
     error.value = null
     val handle = jsonrpc_client_connect(options.toJson().cstr, error.ptr)
-    if (handle == null) throw ffiException(error.value)
+        ?: throw ffiException(error.value)
     IosRpcClient(handle)
 }
 
-@OptIn(ExperimentalForeignApi::class)
 internal actual fun readCertificateFile(path: String): ByteArray {
     val data = NSData.dataWithContentsOfFile(path)
         ?: throw IllegalArgumentException("Unable to read certificate file: $path")
     return data.toByteArray()
 }
 
-@OptIn(ExperimentalForeignApi::class)
 internal actual fun readCertificateAsset(name: String): ByteArray {
     val extensionStart = name.lastIndexOf('.')
     val fileName = if (extensionStart >= 0) name.substring(0, extensionStart) else name
@@ -83,7 +77,7 @@ private class IosRpcClient(private val handle: COpaquePointer) : PlatformRpcClie
         val error = alloc<CPointerVar<ByteVar>>()
         error.value = null
         val result = jsonrpc_client_call(handle, method.cstr, paramsJson?.cstr, error.ptr)
-        if (result == null) throw ffiException(error.value)
+            ?: throw ffiException(error.value)
         try {
             result.toKString()
         } finally {

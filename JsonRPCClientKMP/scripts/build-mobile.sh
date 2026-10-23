@@ -4,8 +4,10 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 UPSTREAM_URL="https://github.com/vsvictor/JSON-RPC-2.git"
 UPSTREAM_REF="${JSON_RPC_2_REF:-start}"
-UPSTREAM_DIR="$PROJECT_ROOT/build/upstream/JSON-RPC-2"
-UPSTREAM_MANIFESTS=("Cargo.toml" "json-rpc-2-datagram/Cargo.toml")
+UPSTREAM_DIR="${JSON_RPC_2_DIR:-$PROJECT_ROOT/build/upstream/JSON-RPC-2}"
+if [[ ! -f "$UPSTREAM_DIR/Cargo.toml" && -e "$UPSTREAM_DIR" ]]; then
+    UPSTREAM_DIR="${UPSTREAM_DIR}-refreshed"
+fi
 LIVENESS_PATCH="$PROJECT_ROOT/scripts/mobile-liveness.patch"
 GENERATED="$PROJECT_ROOT/build/generated"
 ANDROID_OUT="$PROJECT_ROOT/src/androidMain/jniLibs"
@@ -62,16 +64,7 @@ if [[ ! -d "$UPSTREAM_DIR/.git" ]]; then
     git clone --filter=blob:none --no-checkout "$UPSTREAM_URL" "$UPSTREAM_DIR"
 fi
 git -C "$UPSTREAM_DIR" fetch --quiet --depth 1 origin "$UPSTREAM_REF"
-if git -C "$UPSTREAM_DIR" apply --reverse --check "$LIVENESS_PATCH" 2>/dev/null; then
-    git -C "$UPSTREAM_DIR" apply --reverse "$LIVENESS_PATCH"
-fi
-for manifest in "${UPSTREAM_MANIFESTS[@]}"; do
-    if [[ -f "$UPSTREAM_DIR/$manifest" ]]; then
-        git -C "$UPSTREAM_DIR" show "FETCH_HEAD:$manifest" > "$UPSTREAM_DIR/$manifest.upstream"
-        mv "$UPSTREAM_DIR/$manifest.upstream" "$UPSTREAM_DIR/$manifest"
-    fi
-done
-git -C "$UPSTREAM_DIR" checkout --quiet --detach FETCH_HEAD
+git -C "$UPSTREAM_DIR" checkout --quiet --force --detach FETCH_HEAD
 UPSTREAM_REVISION="$(git -C "$UPSTREAM_DIR" rev-parse HEAD)"
 echo "Using JSON-RPC-2 revision $UPSTREAM_REVISION"
 git -C "$UPSTREAM_DIR" apply --check "$LIVENESS_PATCH"
@@ -190,9 +183,9 @@ KOTLIN_BINDINGS="$GENERATED/kotlin"
 SWIFT_BINDINGS="$GENERATED/swift"
 rm -rf "$KOTLIN_BINDINGS" "$SWIFT_BINDINGS"
 cargo run --quiet -p json-rpc-2-ffi --features uniffi-bindgen --bin uniffi-bindgen -- \
-    generate --library "$HOST_LIBRARY" --language kotlin --out-dir "$KOTLIN_BINDINGS"
+    generate --library "$HOST_LIBRARY" --language kotlin --out-dir "$KOTLIN_BINDINGS" --no-format
 cargo run --quiet -p json-rpc-2-ffi --features uniffi-bindgen --bin uniffi-bindgen -- \
-    generate --library "$HOST_LIBRARY" --language swift --out-dir "$SWIFT_BINDINGS"
+    generate --library "$HOST_LIBRARY" --language swift --out-dir "$SWIFT_BINDINGS" --no-format
 
 ANDROID_PACKAGE="$PROJECT_ROOT/src/androidMain/kotlin/uniffi/json_rpc_2_ffi"
 mkdir -p "$ANDROID_PACKAGE"
@@ -210,6 +203,7 @@ if [[ "$TARGET" == android || "$TARGET" == all ]]; then
 fi
 
 if [[ "$TARGET" == ios || "$TARGET" == all ]]; then
+    export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-15.0}"
     rustup target add aarch64-apple-ios aarch64-apple-ios-sim
     rm -rf "$IOS_OUT"
     for triple in aarch64-apple-ios aarch64-apple-ios-sim; do
@@ -218,11 +212,11 @@ if [[ "$TARGET" == ios || "$TARGET" == all ]]; then
         if [[ "$triple" == aarch64-apple-ios ]]; then
             sdk=iphoneos
             slice=ios-arm64
-            swift_target=arm64-apple-ios13.0
+            swift_target="arm64-apple-ios${IPHONEOS_DEPLOYMENT_TARGET}"
         else
             sdk=iphonesimulator
             slice=ios-arm64-simulator
-            swift_target=arm64-apple-ios13.0-simulator
+            swift_target="arm64-apple-ios${IPHONEOS_DEPLOYMENT_TARGET}-simulator"
         fi
         sdk_path="$(xcrun --sdk "$sdk" --show-sdk-path)"
         slice_dir="$IOS_OUT/$slice"
@@ -241,6 +235,7 @@ if [[ "$TARGET" == ios || "$TARGET" == all ]]; then
             "$SWIFT_BINDINGS/json_rpc_2_ffi.swift" \
             "$PROJECT_ROOT/src/iosMain/swift/JsonRpcBridge.swift"
         xcrun libtool -static \
+            -no_warning_for_no_symbols \
             -o "$slice_dir/libjsonrpc_bridge.a" \
             "$swift_archive" \
             "$UPSTREAM_DIR/target/$triple/release/libjson_rpc_2_ffi.a"

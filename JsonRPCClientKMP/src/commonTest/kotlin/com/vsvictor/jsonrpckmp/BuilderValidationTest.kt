@@ -2,13 +2,11 @@ package com.vsvictor.jsonrpckmp
 
 import kotlinx.coroutines.test.runTest
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-@OptIn(ExperimentalEncodingApi::class)
 class BuilderValidationTest {
     private val pem = "-----BEGIN CERTIFICATE-----\nAQID\n-----END CERTIFICATE-----\n"
 
@@ -41,7 +39,7 @@ class BuilderValidationTest {
 
     @Test
     fun kernelOnlyTransportsAreRejectedOnIos() = runTest {
-        if (!Platform.isIos) return@runTest
+        if (!isIosPlatform) return@runTest
         RpcTransport.entries.filterNot { it.supportedOnIos }.forEach { transport ->
             assertFailsWith<UnsupportedOperationException> {
                 JsonRpcClientBuilder.builder(transport, "localhost", 9000).connect()
